@@ -1,0 +1,166 @@
+
+case "$TERM" in
+    screen) color_prompt=yes;;
+    xterm-color) color_prompt=yes;;
+    xterm-256color) color_prompt=yes;;
+    xterm) color_prompt=yes;;
+esac
+if [ "$color_prompt" = yes ]; then
+    COLOR_RED="\033[01;31m"
+    COLOR_GREEN="\033[01;32m"
+    COLOR_YELLOW="\033[01;33m"
+    COLOR_BLUE="\033[01;34m"
+    COLOR_NONE="\033[00m"
+fi
+
+# check to see if we are running from a bash script
+if [ -z "${BASH}" ]; then
+    echo -e $COLOR_RED"WARNING! You are running in an unsupported shell"$COLOR_NONE
+    echo -e $COLOR_RED"Please use BASH shell to get full tools support"$COLOR_NONE
+fi
+
+# check open file limit
+LIMIT=`ulimit -n`
+if [ $LIMIT -lt 1024 ]; then
+	echo -e $COLOR_RED"WARNING: Open file limit of $LIMIT is less than minimum recommended (1024)"$COLOR_NONE
+	echo -e $COLOR_RED"Please run 'ulimit -n 1024' before building to avoid errors"$COLOR_NONE
+fi
+
+# touch ~/.disable-firefly-color-prompt to disable
+firefly-color-prompt() { # color my prompt
+    declare -F __git_ps1 >/dev/null || {
+        if [ -f /etc/bash_completion.d/git-prompt.sh ]; then
+            # this is where the files are supposed to be in linux git 1.7.12+,
+            # but it's broken at least as far as git 1.8.2
+            . /etc/bash_completion.d/git-prompt.sh
+            . /etc/bash_completion.d/git-completion.bash
+        elif [ -f /usr/share/doc/git/contrib/completion/git-prompt.sh ]; then
+            # linux git 1.7.12 or newer
+            . /usr/share/doc/git/contrib/completion/git-prompt.sh
+            . /usr/share/doc/git/contrib/completion/git-completion.bash
+        elif [ -f /etc/bash_completion.d/git ]; then
+            # linux git 1.7.11 or older
+            . /etc/bash_completion
+        elif [ -f /usr/local/etc/bash_completion.d/git-prompt.sh ]; then
+            # osx, brew install git bash-completion
+            . /usr/local/etc/bash_completion.d/git-prompt.sh
+            . /usr/local/etc/bash_completion.d/git-completion.bash
+        else
+            echo "Git bash completion is not available. To enable firefly-color-prompt, run"
+            [ "$(uname -s)" = "Darwin" ] && {
+                echo "  brew install bash-completion"
+            } || {
+                echo "  sudo apt-get install bash-completion"
+            }
+            echo "You may need to start a new terminal for the changes to take effect"
+            return
+        fi
+        declare -F __git_ps1 >/dev/null && {
+            echo "Git bash completion is available, but not set in you environment. Did you remove bash completion from .bashrc?"
+        } || {
+            echo "Git bash completion appears to be broken. Please verify you have a supported version of git. https://dp.amazon.com/x/-iVsAQ"
+            return
+        }
+    }
+
+    function __git_prompt() {
+        if git status &>/dev/null; then
+            local gs_wd=$(git status --porcelain | grep -c '^.[MADRCU]')
+            local gs_i=$(git status --porcelain | grep -c '^[MADRCU]')
+            if [ $gs_wd = 0 ]; then
+                if [ $gs_i = 0 ]; then
+                    local gs_untracked=$(git status --porcelain | grep -c '^??')
+                    if [ $gs_untracked = 0 ]; then
+                        # No uncommitted changes
+                        local color=$COLOR_RED
+                    else
+                        # Untracked files
+                        local color="\033[35m"
+                    fi
+                else
+                    # All changes are staged
+                    local color=$COLOR_YELLOW
+                fi
+            else
+                if [ $gs_i = 0 ]; then
+                    # Changes, but none are staged
+                    local color=$COLOR_GREEN
+                else
+                    # Staged and unstaged changes
+                    if [ "$(uname -s)" = "Darwin" ]; then
+                        # OSX has a bright magenta, not a deep purple
+                        # Yellow on red
+                        local color="\033[33;41m"
+                    else
+                        # Yellow on purple
+                        local color="\033[33;45m"
+                    fi
+                fi
+            fi
+            color="$2${color}$3"
+            __git_ps1 " "$color"%s"
+            return
+        fi
+        __git_ps1 "$1"
+    }
+
+    local _reset="\[${COLOR_NONE}\]"
+    local _red="\[${COLOR_RED}\]"
+    local _green="\[${COLOR_GREEN}\]"
+    local _blue="\[${COLOR_BLUE}\]"
+    PS1='${debian_chroot:+($debian_chroot)}'
+    PS1=$PS1${_green}"\\u@\\h"
+    PS1=$PS1${_reset}":"
+    PS1=$PS1${_blue}"\\w"
+    PS1=$PS1"\$(__git_prompt ' "${_red}"%s' \[ \])"
+    PS1=$PS1${_reset}"\\$ "
+}
+
+# touch ~/.disable-firefly-title-prompt to disable
+#firefly-title-prompt() {
+	# Uncommenting for now. Will replace with something like WORKSPACE [ VERSIONSET ] in the future perhaps
+    #if [ -n "$SANTOS_BUILD_PROJECT" ]; then
+    #    local WORKSPACE_NAME="$(basename $SANTOS_BUILD_PROJECT)"
+    #    case $PWD in
+    #        $SANTOS_BUILD_PROJECT)
+    #            local WORKSPACE_PATH="$WORKSPACE_NAME"
+    #            ;;
+    #        $SANTOS_BUILD_PROJECT/*)
+    #            local WORKSPACE_PATH="$WORKSPACE_NAME/${PWD#${SANTOS_BUILD_PROJECT}/}"
+    #            ;;
+    #    esac
+    #fi
+    #if [ -z "$WORKSPACE_PATH" ]; then
+    #    local SANTOS_NAME="$(basename $SANTOS_ROOT)"
+    #    case $PWD in
+    #        $SANTOS_ROOT)
+    #            local WORKSPACE_PATH="$SANTOS_NAME"
+    #            ;;
+    #        $SANTOS_ROOT/*)
+    #            local WORKSPACE_PATH="$SANTOS_NAME/${PWD#${SANTOS_ROOT}/}"
+    #            ;;
+    #    esac
+    #fi
+    #local SANTOS_TITLE="$WORKSPACE_PATH [${PRODSTRING}]"
+    #case "$TERM" in
+    #    screen) printf '\ek%s\e\\' "$SANTOS_TITLE";;
+    #    xterm*) printf '\e]0;%s\007' "$SANTOS_TITLE";;
+    #esac
+#}
+
+# Is stdin an interactive terminal?
+if [ -t 0 ]; then
+    [ -f ~/.disable-firefly-color-prompt ] || [ "$STAY_OFF_MY_LAWN" != "" ] || firefly-color-prompt
+    # Replace envsetup's settitle, so we don't lose control post-lunch
+    #unset settitle
+    #settitle() {
+    #    export PROMPT_COMMAND="firefly-title-prompt"
+    #}
+    #[ -f ~/.disable-firefly-title-prompt ] || [ "$STAY_OFF_MY_LAWN" != "" ] || settitle
+else
+    unset settitle
+    settitle() {
+        :
+    }
+fi
+

@@ -1,0 +1,16 @@
+set smartindent
+set tabstop=4
+set shiftwidth=4
+set expandtab
+set hlsearch
+set hidden
+set ignorecase
+set smartcase
+set laststatus=2
+set nonumber
+set paste
+set mouse-=a
+set ruler
+syntax on
+set backspace=indent,eol,start
+set display+=lastline
